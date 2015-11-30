@@ -19,9 +19,14 @@ Tag = require './models/tag'
 Delta = require './models/delta'
 Label = require('./models/folder').Label
 Folder = require('./models/folder').Folder
+inspect = require('util').inspect
 
 Attributes = require './models/attributes'
 
+Logger = require('tracer').colorConsole
+  format: "{{message}}"
+
+concurrentRequests = 0
 
 module.exports =
 class NylasConnection
@@ -58,21 +63,32 @@ class NylasConnection
     return options
 
   request: (options={}) ->
+    concurrentRequests++
+    Logger.info 'Nylas API request started', options.method, options.path, 'concurrent:', concurrentRequests, inspect(options).replace(/[ \n]+/g,' ')
+    startTime = new Date
+
     options = @requestOptions(options)
 
     new Promise (resolve, reject) ->
       request options, (error, response, body) ->
+        concurrentRequests--
+        endTime = new Date
+        delta = (endTime - startTime) / 1000
         if error or _.isUndefined(response) or response.statusCode > 299
           error ?= new Error(body.message)
+          Logger.warn 'Nylas API request recieved an error response', delta, concurrentRequests, response.statusCode, body.message
           reject(error)
         else
           if options.url and options.url.split('/').pop() == 'download'
+            Logger.info 'Nylas API request completed successfully', options.method, options.path, 'delta:', delta, 'concurrent:', concurrentRequests
             return resolve(response)
           else
             try
               body = JSON.parse(body) if _.isString body
+              Logger.info 'Nylas API request completed successfully', options.method, options.path, 'delta:', delta, 'concurrent:', concurrentRequests
               resolve(body)
             catch error
+              Logger.error 'Nylas API request threw an error parsing the body as JSON', delta, concurrentRequests, error
               reject(error)
 
   # /send endpoint used for sending messages via direct or MIME methods
