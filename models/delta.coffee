@@ -141,6 +141,6 @@ class DeltaStream extends EventEmitter
     @emit('error', err)
 
   _restartConnection: (n) ->
-    console.log "Restarting Nylas DeltaStream connection (attempt #{n + 1})", @
+    console.log "Restarting Nylas DeltaStream connection (attempt #{n + 1})" #, @
     @close()
     @open()
